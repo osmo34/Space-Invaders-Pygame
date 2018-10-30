@@ -2,6 +2,7 @@
 # CS50 final project
 
 import pygame
+import random
 
 # init pygame
 pygame.init()
@@ -12,15 +13,21 @@ clock = pygame.time.Clock()
 
 # load sprites - current images being used are from Kenny https://www.kenney.nl/assets/space-shooter-redux
 player_sprite = pygame.image.load('playerShip2_green.png') 
+player_projectile_sprite = pygame.image.load('laserBlue07.png') 
+enemy_projectile_sprite = pygame.image.load('laserRed03.png') 
 enemy_sprite = pygame.image.load('enemyBlue2.png')
 
 # scale sprites
 player_sprite = pygame.transform.scale(player_sprite, (28, 19))
+player_projectile_sprite = pygame.transform.scale(player_projectile_sprite, (5, 25))
+enemy_projectile_sprite = pygame.transform.scale(enemy_projectile_sprite, (5, 25))
 enemy_sprite = pygame.transform.scale(enemy_sprite, (26, 21))
 
 # player globals
 player_start_x = 500
 player_start_y = 700
+
+player_projectile_speed = 10
 
 # ememy globals
 enemy_speed = 2
@@ -36,6 +43,9 @@ default_enemy_x_pos = 150
 default_enemy_y_pos = 50
 enemy_edge_right = 1000
 enemy_edge_left = 0
+enemy_fire_rate = 3000 # max seed
+
+enemy_projectile_seed = -5
 
 
 # sprite base class
@@ -52,16 +62,76 @@ class Player(Sprite):
         self.speed = 6
         self.position_x = player_start_x
         self.position_y = player_start_y
+        self.projectile_offset_x = 11.5
+        self.projectile_offset_y = 25
+        self.projectile = Projectile(self.position_x + self.projectile_offset_x, self.position_y - self.projectile_offset_y, player_projectile_speed, False)
 
     # player updates
     def update(self):
         self.__updateInput()
+        self.__updateProjectile()
         
     # input updates
     def __updateInput(self):
         k_pressed = pygame.key.get_pressed()            
         if k_pressed[pygame.K_LEFT]: self.position_x -= self.speed
         if k_pressed[pygame.K_RIGHT]: self.position_x += self.speed
+        
+        if not self.projectile.firing:
+            if k_pressed[pygame.K_SPACE]:
+                self.projectile.firing = True
+
+    def __updateProjectile(self):
+        self.projectile.update(self.position_x + self.projectile_offset_x, self.position_y - self.projectile_offset_y)
+
+
+
+class Projectile(Sprite):
+    def __init__(self, pos_x, pos_y, speed, enemy):
+        self.position_x = pos_x
+        self.position_y = pos_y
+        self.firing = False
+        self.projectile_speed = speed
+        self.is_enemy = enemy
+
+    def update(self, pos_x, pos_y):
+        self.__move_projectile(pos_x, pos_y)
+        if not self.is_enemy:
+            self.__check_screen_top(pos_x, pos_y)
+        elif self.is_enemy:
+            self.__check_screen_bottom(pos_x, pos_y)
+            self.__enemy_fire()
+    
+    # move dependent on if we are firing or not
+    def __move_projectile(self, pos_x, pos_y):
+        if not self.firing:
+            self.position_x = pos_x
+            self.position_y = pos_y
+        elif self.firing:
+            self.position_y -= self.projectile_speed
+
+    # only relevent for player projectile
+    def __check_screen_top(self, pos_x, pos_y):
+        if self.position_y <= 0:
+            self.position_x = pos_x
+            self.position_y = pos_y
+            self.firing = False
+
+    # only relevent for enemy laser
+    def __check_screen_bottom(self, pos_x, pos_y):
+        if self.position_y >= 768:
+            self.position_x = pos_x
+            self.position_y = pos_y
+            self.firing = False
+    
+    # define when an enemy fires
+    def __enemy_fire(self):
+        # fire at random
+        if not self.firing:
+            seed = random.randint(1, enemy_fire_rate)
+            if seed == 10: # doesn't matter what number this is, as long as it's under enemy_fire_rate 
+                self.firing = True
+
 
 
 
@@ -93,6 +163,8 @@ class EnemyController():
     def draw(self):
         for enemy in self.enemy_list:
             enemy.draw(enemy_sprite, enemy.position_x, enemy.position_y)
+            if enemy.projectile.firing:
+                enemy.projectile.draw(enemy_projectile_sprite, enemy.projectile.position_x, enemy.projectile.position_y)
 
 
 
@@ -102,11 +174,13 @@ class Enemy(Sprite):
     def __init__(self, pos_x, pos_y):
         self.position_x = pos_x
         self.position_y = pos_y
-        self.initial_height = pos_y        
+        self.initial_height = pos_y
+        self.projectile = Projectile(self.position_x + 11, self.position_y + 20, enemy_projectile_seed, True)
 
     def update(self):
         self.__move_enemy()
         self.__check_enemy_height()
+        self.projectile.update(self.position_x + 11, self.position_y + 20)
 
     def __move_enemy(self):              
         self.position_x += enemy_speed        
@@ -152,6 +226,8 @@ while not done:
     # draw
     screen.fill((0,0,0))
     player.draw(player_sprite, player.position_x, player.position_y)
+    if player.projectile.firing:
+        player.projectile.draw(player_projectile_sprite, player.projectile.position_x, player.projectile.position_y)
     enemy_controller.draw()
     pygame.display.update()
 
