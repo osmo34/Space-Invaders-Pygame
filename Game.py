@@ -50,15 +50,30 @@ enemy_projectile_seed = -5
 
 # sprite base class
 class Sprite:
+    def __init__(self):
+        self.left = 0
+        self.right = 0
+        self.top = 0
+        self.bottom = 0        
+
     # draw which should be inherited
     def draw(self, sprite, pos_x, pos_y):
         screen.blit(sprite, (pos_x, pos_y))
+        self.update_rect(sprite, pos_x, pos_y)
+        
+    def update_rect(self, sprite, posx, posy):
+        sprite_rect = sprite.get_rect()
+        self.left = posx + sprite_rect.left
+        self.right = posx + sprite_rect.right
+        self.top = posy + sprite_rect.top
+        self.bottom = posy + sprite_rect.bottom
         
 
 
 # player class
 class Player(Sprite): 
     def __init__(self):
+        super(Player, self).__init__()
         self.speed = 6
         self.position_x = player_start_x
         self.position_y = player_start_y
@@ -67,9 +82,10 @@ class Player(Sprite):
         self.projectile = Projectile(self.position_x + self.projectile_offset_x, self.position_y - self.projectile_offset_y, player_projectile_speed, False)
 
     # player updates
-    def update(self):
+    def update(self):        
         self.__updateInput()
-        self.__updateProjectile()
+        self.__updateProjectile()       
+        
         
     # input updates
     def __updateInput(self):
@@ -88,19 +104,35 @@ class Player(Sprite):
 
 class Projectile(Sprite):
     def __init__(self, pos_x, pos_y, speed, enemy):
+        super(Projectile, self).__init__()
         self.position_x = pos_x
         self.position_y = pos_y
         self.firing = False
+        self.hit_enemy = False
         self.projectile_speed = speed
         self.is_enemy = enemy
 
-    def update(self, pos_x, pos_y):
+    def update(self, pos_x, pos_y):                
         self.__move_projectile(pos_x, pos_y)
-        if not self.is_enemy:
+        if not self.is_enemy:            
             self.__check_screen_top(pos_x, pos_y)
+            if self.hit_enemy:
+                self.__hit_enemy(pos_x, pos_y)
+                
+
         elif self.is_enemy:
             self.__check_screen_bottom(pos_x, pos_y)
             self.__enemy_fire()
+
+            
+
+    # check if projectile hit enemy - player only
+    def __hit_enemy(self, pos_x, pos_y):        
+        self.position_x = pos_x
+        self.position_y = pos_y
+        self.firing = False
+        self.hit_enemy = False
+
     
     # move dependent on if we are firing or not
     def __move_projectile(self, pos_x, pos_y):
@@ -165,6 +197,8 @@ class EnemyController():
             enemy.draw(enemy_sprite, enemy.position_x, enemy.position_y)
             if enemy.projectile.firing:
                 enemy.projectile.draw(enemy_projectile_sprite, enemy.projectile.position_x, enemy.projectile.position_y)
+            else:
+                enemy.projectile.update_rect(enemy_projectile_sprite, enemy.projectile.position_x, enemy.projectile.position_y)
 
 
 
@@ -172,21 +206,32 @@ class EnemyController():
 # enemy class
 class Enemy(Sprite):
     def __init__(self, pos_x, pos_y):
+        super(Enemy, self).__init__()
         self.position_x = pos_x
         self.position_y = pos_y
         self.initial_height = pos_y
         self.projectile = Projectile(self.position_x + 11, self.position_y + 20, enemy_projectile_seed, True)
+        self.dead = False
 
     def update(self):
         self.__move_enemy()
         self.__check_enemy_height()
         self.projectile.update(self.position_x + 11, self.position_y + 20)
+        self.check_dead()
 
     def __move_enemy(self):              
         self.position_x += enemy_speed        
 
     def __check_enemy_height(self):
         self.position_y = self.initial_height + enemy_update_height
+
+    def check_dead(self):
+        if self.dead:
+            # if dead throw position into no mans land - way off the screen
+            self.position_x = -1000
+            self.position_y = 1000
+       
+
 
 
 # class for enemy movement
@@ -195,8 +240,11 @@ class EnemyMovement:
         global enemy_speed
         global enemy_update_height
 
-        for enemy in enemies:            
-            if enemy.position_x >= enemy_edge_right:                
+        for enemy in enemies:
+            if enemy.dead:
+                enemy.position_x = enemy.position_x
+                enemy.position_y = enemy.position_y
+            elif enemy.position_x >= enemy_edge_right:                
                 enemy_speed = enemy_speed_left
                 enemy_update_height += enemy_drop_height
             elif enemy.position_x <= enemy_edge_left:
@@ -204,11 +252,34 @@ class EnemyMovement:
                 enemy_update_height += enemy_drop_height
 
 
+class Collision:    
+    # check if projectile hits enemy
+    def checkEnemies(self, enemy, projectile):
+        projectile_position = (projectile.left, projectile.right, projectile.top)
+        enemy_position = (enemy.left, enemy.right, enemy.top, enemy.bottom)        
+        
+        # default position at start of game is 0 - ignore this
+        if (projectile_position[0]) == 0:
+            del projectile_position
+            del enemy_position
+            return False
+
+        if projectile_position[0] <= enemy_position[1] and projectile_position[1] >= enemy_position[0] and projectile_position[2] <= enemy_position[3] and projectile_position[2] >= enemy_position[2]:                                                
+            del projectile_position
+            del enemy_position
+            return True
+        else:
+            del projectile_position
+            del enemy_position
+            return False
+            
+
 
 # create instances   
 player = Player()
 enemy_controller = EnemyController()
 enemy_controller.initialize()
+collision = Collision()
 
 # run game loop
 while not done:
@@ -222,12 +293,21 @@ while not done:
     # update game items
     player.update()
     enemy_controller.update()
+
+
+    for enemies in enemy_controller.enemy_list:         
+        if collision.checkEnemies(enemies, player.projectile):
+            enemies.dead = True
+            player.projectile.hit_enemy = True
+            break            
     
     # draw
     screen.fill((0,0,0))
     player.draw(player_sprite, player.position_x, player.position_y)
     if player.projectile.firing:
         player.projectile.draw(player_projectile_sprite, player.projectile.position_x, player.projectile.position_y)
+    else:
+        player.projectile.update_rect(player_projectile_sprite, player.projectile.position_x, player.projectile.position_y) # if we are not drawing we still need to track the sprite position
     enemy_controller.draw()
     pygame.display.update()
 
