@@ -11,6 +11,8 @@ done = False # game loop
 
 clock = pygame.time.Clock()
 
+pygame.font.init()
+
 # load sprites - current images being used are from Kenny https://www.kenney.nl/assets/space-shooter-redux
 player_sprite = pygame.image.load('textures/player/playerShip2_green.png') 
 player_projectile_sprite = pygame.image.load('textures/projectile/laserBlue07.png') 
@@ -85,7 +87,7 @@ player_explosion_sprite = [
 background_sprite = pygame.image.load('textures/bg/background_01.png').convert()
 
 # scale sprites
-player_sprite = pygame.transform.scale(player_sprite, (28, 19))
+player_sprite = pygame.transform.scale(player_sprite, (42, 28))
 player_projectile_sprite = pygame.transform.scale(player_projectile_sprite, (5, 25))
 enemy_projectile_sprite = pygame.transform.scale(enemy_projectile_sprite, (5, 25))
 
@@ -106,6 +108,12 @@ player_laser = pygame.mixer.Sound('sound/sound_spark_Laser-Like_Synth_Basic_Lase
 enemy_exploision = pygame.mixer.Sound('sound/Explosion+3.wav')
 enemy_exploision.set_volume(0.05)
 player_laser.set_volume(0.1)
+
+# game globals
+base_score = 0
+base_lives = 3
+score = base_score
+lives = base_lives
 
 # player globals
 player_start_x = 500
@@ -170,7 +178,6 @@ class Explosion:
         self.offset = offset
 
     def prepare(self, posx, posy):    
-        #offset = 16 # makes the explosion a bit higher
         self.pos_x = posx - self.offset
         self.pos_y = posy - self.offset
         # reset counters for the player who could potentially blow up multiple times TODO: might be needed for enemies in multiple levels...
@@ -180,7 +187,6 @@ class Explosion:
             self.reset = False
 
     def update(self):
-
         if self.new_explosion:
             self.created_time = pygame.time.get_ticks()
             self.new_explosion = False
@@ -228,8 +234,7 @@ class Player(Sprite):
         self.__updateProjectile()       
         self.__checkDead()
         self.__checkEdge()
-        self.explosion()   
-        
+        self.explosion()           
         
     # input updates
     def __updateInput(self):
@@ -275,13 +280,9 @@ class Player(Sprite):
                 self.create_explosion = False
                 self.explode.reset = True
 
-        
-        
 
 
-
-
-
+# create projectiles
 class Projectile(Sprite):
     def __init__(self, pos_x, pos_y, speed, enemy):
         super(Projectile, self).__init__()
@@ -304,15 +305,12 @@ class Projectile(Sprite):
             self.__check_screen_bottom(pos_x, pos_y)
             self.__enemy_fire()
 
-            
-
     # check if projectile hit enemy - player only
     def __hit_enemy(self, pos_x, pos_y):        
         self.position_x = pos_x
         self.position_y = pos_y
         self.firing = False
         self.hit_enemy = False
-
     
     # move dependent on if we are firing or not
     def __move_projectile(self, pos_x, pos_y):
@@ -346,8 +344,6 @@ class Projectile(Sprite):
 
 
 
-
-
 # base controller for enemies
 class EnemyController():
     def __init__(self):
@@ -370,8 +366,6 @@ class EnemyController():
         self.enemy_movement.check_edge(self.enemy_list)
         for enemy in self.enemy_list:
             enemy.update()
-
-
     
     # draw all enemies
     def draw(self):
@@ -384,8 +378,6 @@ class EnemyController():
 
             if enemy.create_explosion:
                 enemy.explode.draw()
-
-
 
 
 # enemy class
@@ -433,10 +425,6 @@ class Enemy(Sprite):
             self.explode.prepare(self.old_pos_x, self.old_pos_y)
             self.explode.update()
 
-                
-
-       
-
 
 
 # class for enemy movement
@@ -457,8 +445,7 @@ class EnemyMovement:
                 enemy_update_height += enemy_drop_height
 
 
-class Collision:    
-
+class Collision:
     def checkCollision(self, target, projectile):
         projectile_position = (projectile.left, projectile.right, projectile.top)
         target_position = (target.left, target.right, target.top, target.bottom)        
@@ -478,6 +465,23 @@ class Collision:
             del target_position
             return False
 
+# create on-screen text
+class Hud:
+    def __init__(self, text, font, colour, position):
+        self.text = text
+        self.font = font
+        self.position = position
+        self.colour = colour
+        self.textsurface = self.font.render(self.text, False, self.colour)
+
+    # call this when text needs to be updated
+    def update(self, text):
+        self.text = text
+        self.textsurface = self.font.render(self.text, False, self.colour)
+
+    def draw(self):
+        screen.blit(self.textsurface, self.position)
+
 
 # create instances   
 player = Player()
@@ -486,6 +490,23 @@ enemy_controller.initialize()
 collision = Collision()
 background = Sprite()
 
+# create display text
+font = pygame.font.Font('font/kenvector_future.ttf', 20)
+green_text = (75, 244, 66)
+yellow_text = (233, 244, 66)
+hud_text = []
+hud_text.append(Hud("Score", font, green_text, (10, 10)))
+hud_text.append(Hud("Lives", font, green_text, (400, 10)))
+hud_text.append(Hud("High Score", font, green_text, (700, 10)))
+hud_text.append(Hud("0000000", font, yellow_text, (875, 10)))
+
+# text that needs to be updated at runtime
+info_text = []
+text_display = [str(score), str(lives)]
+info_text.append(Hud(text_display[0], font, yellow_text, (120, 10)))
+info_text.append(Hud(text_display[1], font, yellow_text, (500, 10)))
+
+# start music
 pygame.mixer.music.play(-1)
 
 # run game loop
@@ -501,20 +522,23 @@ while not done:
     player.update()
     enemy_controller.update()
 
+    # update lives and score text
+    for i in range(len(info_text)):
+        text_display.clear()
+        text_display = [str(score), str(lives)]
+        info_text[i].update(text_display[i])
 
+    # check collisions
     for enemies in enemy_controller.enemy_list:         
         if collision.checkCollision(enemies, player.projectile):
             enemy_exploision.play()
             enemies.dead = True
             player.projectile.hit_enemy = True
             break
-        
-    for enemies in enemy_controller.enemy_list:
         if collision.checkCollision(player, enemies.projectile):
             player.dead = True
-            break
-    
-
+            break     
+        
     # draw
     screen.fill((0,0,0))  
     background.draw(background_sprite, 0, 0)
@@ -527,9 +551,15 @@ while not done:
     if player.create_explosion:
         player.explode.draw()
     enemy_controller.draw()
+
+    # draw hud items
+    for text in hud_text:
+        text.draw()
+
+    for text in info_text:
+        text.draw()
     
     pygame.display.update()
-
 
 pygame.quit()
 
