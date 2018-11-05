@@ -118,14 +118,18 @@ lives = base_lives
 # player globals
 player_start_x = 500
 player_start_y = 700
-
 player_projectile_speed = 10
 
 # ememy globals
-enemy_speed = 2
-enemy_speed_left = -2
-enemy_speed_right = 2
-enemy_drop_height = 2 # how many pixels we should move down on hitting the edge of the screen
+enemy_speed = 2.0
+enemy_speed_left = -2.0
+enemy_speed_right = 2.0
+enemy_speed_multiplier = 0.03
+enemy_speed_last_5 = 2.0
+enemy_speed_multiplier_final = 10.0
+enemy_drop_height = 4 # how many pixels we should move down on hitting the edge of the screen
+enemy_drop_last_5 = 10
+enemy_drop_last = 15
 enemy_update_height = 0 # how many pixels we have moved down
 enemy_horizontal_seperation = 50
 enemy_vertical_seperation = 50
@@ -135,9 +139,16 @@ default_enemy_x_pos = 150
 default_enemy_y_pos = 50
 enemy_edge_right = 1000
 enemy_edge_left = 0
-enemy_fire_rate = 3000 # max seed
-
+enemy_fire_rate = 1000 # max seed
 enemy_projectile_seed = -5
+base_enemy_score = 50
+enemy_score = base_enemy_score
+enemy_count = enemy_rows * enemy_colums + 1
+enemy_fire_rate_multiplier = enemy_fire_rate // enemy_count
+
+
+level_current = 1
+level_multiplier = 1
 
 
 # sprite base class
@@ -206,8 +217,6 @@ class Explosion:
     def draw(self):
         if not self.stop:
             screen.blit(self.sprite[self.current_image], (self.pos_x, self.pos_y))
-                
-        
 
 
 # player class
@@ -254,11 +263,13 @@ class Player(Sprite):
         self.projectile.update(self.position_x + self.projectile_offset_x, self.position_y - self.projectile_offset_y)
 
     def __checkDead(self):
+        global lives
         if self.dead:
             if not self.create_explosion: # get old positions for an explosion
                 self.old_pos_x = self.position_x
                 self.old_pos_y = self.position_y
                 self.create_explosion = True
+                lives -= 1
             self.position_x = 0 # todo: temp
             self.dead = False
 
@@ -411,11 +422,36 @@ class Enemy(Sprite):
         self.position_y = self.initial_height + enemy_update_height
 
     def check_dead(self):
+        global score
+        global enemy_fire_rate
+        global enemy_speed
+        global enemy_speed_left
+        global enemy_speed_right
+        global enemy_count
+        global enemy_drop_height
         if self.dead:            
             if not self.create_explosion: # get old positions for an explosion
                 self.old_pos_x = self.position_x
                 self.old_pos_y = self.position_y
                 self.create_explosion = True
+                
+                score += enemy_score
+                enemy_fire_rate -= enemy_fire_rate_multiplier
+
+                if enemy_count > 5:                    
+                    enemy_speed_left -= enemy_speed_multiplier
+                    enemy_speed_right += enemy_speed_multiplier
+                elif enemy_count <= 6 and enemy_count > 2:                    
+                    enemy_speed_left -= enemy_speed_last_5
+                    enemy_speed_right += enemy_speed_last_5
+                    enemy_drop_height = enemy_drop_last_5
+                elif enemy_count == 2:
+                    enemy_speed_left_= -enemy_speed_multiplier_final
+                    enemy_speed_right = enemy_speed_multiplier_final                             
+                    enemy_drop_height = enemy_drop_last
+                enemy_count -= 1
+                
+
             # if dead throw position into no mans land - way off the screen
             self.position_x = -1000
             self.position_y = 1000
@@ -522,10 +558,13 @@ while not done:
     player.update()
     enemy_controller.update()
 
+    # track score per enemy
+    enemy_score = base_enemy_score * abs(enemy_speed) * level_multiplier
+
     # update lives and score text
     for i in range(len(info_text)):
-        text_display.clear()
-        text_display = [str(score), str(lives)]
+        text_display.clear()        
+        text_display = [str(int(score)), str(lives)]
         info_text[i].update(text_display[i])
 
     # check collisions
