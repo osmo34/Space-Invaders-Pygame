@@ -12,29 +12,98 @@ done = False # game loop
 clock = pygame.time.Clock()
 
 # load sprites - current images being used are from Kenny https://www.kenney.nl/assets/space-shooter-redux
-player_sprite = pygame.image.load('playerShip2_green.png') 
-player_projectile_sprite = pygame.image.load('laserBlue07.png') 
-enemy_projectile_sprite = pygame.image.load('laserRed03.png') 
-enemy_sprite = pygame.image.load('enemyBlue2.png')
-explosion_sprite = [pygame.image.load('explosion1.png'), pygame.image.load('explosion2.png'), pygame.image.load('explosion3.png'), pygame.image.load('explosion4.png'), pygame.image.load('explosion5.png'), pygame.image.load('explosion6.png'), pygame.image.load('explosion7.png'), pygame.image.load('explosion8.png')]
+player_sprite = pygame.image.load('textures/player/playerShip2_green.png') 
+player_projectile_sprite = pygame.image.load('textures/projectile/laserBlue07.png') 
+enemy_projectile_sprite = pygame.image.load('textures/projectile/laserRed03.png') 
+
+enemy_sprite = [
+    pygame.image.load('textures/enemy/enemyBlack1.png'),
+    pygame.image.load('textures/enemy/enemyBlack2.png'),
+    pygame.image.load('textures/enemy/enemyBlack3.png'),
+    pygame.image.load('textures/enemy/enemyBlack4.png'),
+    pygame.image.load('textures/enemy/enemyBlack5.png'),
+    pygame.image.load('textures/enemy/enemyBlue1.png'),
+    pygame.image.load('textures/enemy/enemyBlue2.png'),
+    pygame.image.load('textures/enemy/enemyBlue3.png'),
+    pygame.image.load('textures/enemy/enemyBlue4.png'),
+    pygame.image.load('textures/enemy/enemyBlue5.png'),
+    pygame.image.load('textures/enemy/enemyGreen1.png'),
+    pygame.image.load('textures/enemy/enemyGreen2.png'),
+    pygame.image.load('textures/enemy/enemyGreen3.png'),
+    pygame.image.load('textures/enemy/enemyGreen4.png'),
+    pygame.image.load('textures/enemy/enemyGreen5.png'),
+    pygame.image.load('textures/enemy/enemyRed1.png'),
+    pygame.image.load('textures/enemy/enemyRed2.png'),
+    pygame.image.load('textures/enemy/enemyRed3.png'),
+    pygame.image.load('textures/enemy/enemyRed4.png'),
+    pygame.image.load('textures/enemy/enemyRed5.png')
+    ]
+
+explosion_sprite = [
+    pygame.image.load('textures/explosion_1/explosion1.png'), 
+    pygame.image.load('textures/explosion_1/explosion2.png'), 
+    pygame.image.load('textures/explosion_1/explosion3.png'), 
+    pygame.image.load('textures/explosion_1/explosion4.png'), 
+    pygame.image.load('textures/explosion_1/explosion5.png'), 
+    pygame.image.load('textures/explosion_1/explosion6.png'), 
+    pygame.image.load('textures/explosion_1/explosion7.png'), 
+    pygame.image.load('textures/explosion_1/explosion8.png')
+    ]
+
+player_explosion_sprite = [
+    pygame.image.load('textures/explosion_2/explosion1.png'), 
+    pygame.image.load('textures/explosion_2/explosion2.png'), 
+    pygame.image.load('textures/explosion_2/explosion3.png'), 
+    pygame.image.load('textures/explosion_2/explosion4.png'), 
+    pygame.image.load('textures/explosion_2/explosion5.png'), 
+    pygame.image.load('textures/explosion_2/explosion6.png'), 
+    pygame.image.load('textures/explosion_2/explosion7.png'), 
+    pygame.image.load('textures/explosion_2/explosion8.png'),
+    pygame.image.load('textures/explosion_2/explosion9.png'), 
+    pygame.image.load('textures/explosion_2/explosion10.png'), 
+    pygame.image.load('textures/explosion_2/explosion11.png'), 
+    pygame.image.load('textures/explosion_2/explosion12.png'), 
+    pygame.image.load('textures/explosion_2/explosion13.png'), 
+    pygame.image.load('textures/explosion_2/explosion14.png'), 
+    pygame.image.load('textures/explosion_2/explosion15.png'), 
+    pygame.image.load('textures/explosion_2/explosion16.png'),
+    pygame.image.load('textures/explosion_2/explosion17.png'), 
+    pygame.image.load('textures/explosion_2/explosion18.png'), 
+    pygame.image.load('textures/explosion_2/explosion19.png'), 
+    pygame.image.load('textures/explosion_2/explosion20.png'), 
+    pygame.image.load('textures/explosion_2/explosion21.png'), 
+    pygame.image.load('textures/explosion_2/explosion22.png'), 
+    pygame.image.load('textures/explosion_2/explosion23.png'), 
+    pygame.image.load('textures/explosion_2/explosion24.png'),
+    pygame.image.load('textures/explosion_2/explosion25.png'), 
+    pygame.image.load('textures/explosion_2/explosion26.png'), 
+    pygame.image.load('textures/explosion_2/explosion27.png'), 
+    pygame.image.load('textures/explosion_2/explosion28.png')
+    ]
 
 # background
-background_sprite = pygame.image.load('background_01.png').convert()
+background_sprite = pygame.image.load('textures/bg/background_01.png').convert()
 
 # scale sprites
 player_sprite = pygame.transform.scale(player_sprite, (28, 19))
 player_projectile_sprite = pygame.transform.scale(player_projectile_sprite, (5, 25))
 enemy_projectile_sprite = pygame.transform.scale(enemy_projectile_sprite, (5, 25))
-enemy_sprite = pygame.transform.scale(enemy_sprite, (26, 21))
+
+for i in range(len(enemy_sprite)):
+    enemy_sprite[i] = pygame.transform.scale(enemy_sprite[i], (26, 21))
+
 for i in range(len(explosion_sprite)):
     explosion_sprite[i] = pygame.transform.scale(explosion_sprite[i], (64, 64))
 
+for i in range(len(player_explosion_sprite)):
+    player_explosion_sprite[i] = pygame.transform.scale(player_explosion_sprite[i], (128, 128))
+
 # music
-game_music_1 = pygame.mixer.music.load('Steamtech-Mayhem.ogg')
+game_music_1 = pygame.mixer.music.load('sound/Steamtech-Mayhem.ogg')
 
 # sound effects
-player_laser = pygame.mixer.Sound('sound_spark_Laser-Like_Synth_Basic_Laser1_14.wav')
-enemy_exploision = pygame.mixer.Sound('Explosion+3.wav')
+player_laser = pygame.mixer.Sound('sound/sound_spark_Laser-Like_Synth_Basic_Laser1_14.wav')
+enemy_exploision = pygame.mixer.Sound('sound/Explosion+3.wav')
 enemy_exploision.set_volume(0.05)
 player_laser.set_volume(0.1)
 
@@ -86,7 +155,7 @@ class Sprite:
 
 # create explosion
 class Explosion:
-    def __init__(self, spr):
+    def __init__(self, spr, offset):
         self.image_count = len(spr)
         self.sprite = spr        
         self.current_image = 0      
@@ -97,11 +166,18 @@ class Explosion:
         self.stop = False
         self.pos_x = 0
         self.pos_y = 0
+        self.reset = False
+        self.offset = offset
 
     def prepare(self, posx, posy):    
-        offset = 16 # makes the explosion a bit higher
-        self.pos_x = posx
-        self.pos_y = posy - offset
+        #offset = 16 # makes the explosion a bit higher
+        self.pos_x = posx - self.offset
+        self.pos_y = posy - self.offset
+        # reset counters for the player who could potentially blow up multiple times TODO: might be needed for enemies in multiple levels...
+        if self.stop and self.reset:
+            self.new_explosion = True
+            self.stop = False
+            self.reset = False
 
     def update(self):
 
@@ -113,8 +189,9 @@ class Explosion:
 
         if not self.stop:
             self.current_time += self.seconds
-            if (self.current_image == 7):
+            if (self.current_image == self.image_count - 1):                
                 self.stop = True
+                self.current_image = 0 
 
             if self.current_time >= 1:
                 self.current_image += 1            
@@ -123,6 +200,8 @@ class Explosion:
     def draw(self):
         if not self.stop:
             screen.blit(self.sprite[self.current_image], (self.pos_x, self.pos_y))
+                
+        
 
 
 # player class
@@ -136,20 +215,29 @@ class Player(Sprite):
         self.projectile_offset_y = 25
         self.projectile = Projectile(self.position_x + self.projectile_offset_x, self.position_y - self.projectile_offset_y, player_projectile_speed, False)
         self.dead = False
+        self.hit_right = False
+        self.hit_left = False
+        self.create_explosion = False
+        self.old_pos_x = 0
+        self.old_pos_y = 0
+        self.explode = Explosion(player_explosion_sprite, 64)
 
     # player updates
     def update(self):        
         self.__updateInput()
         self.__updateProjectile()       
         self.__checkDead()
-        
+        self.__checkEdge()
+        self.explosion()   
         
         
     # input updates
     def __updateInput(self):
-        k_pressed = pygame.key.get_pressed()            
-        if k_pressed[pygame.K_LEFT]: self.position_x -= self.speed
-        if k_pressed[pygame.K_RIGHT]: self.position_x += self.speed
+        k_pressed = pygame.key.get_pressed()
+        if not self.hit_left:
+            if k_pressed[pygame.K_LEFT]: self.position_x -= self.speed
+        if not self.hit_right:
+            if k_pressed[pygame.K_RIGHT]: self.position_x += self.speed
         
         if not self.projectile.firing:
             global player_laser
@@ -162,8 +250,35 @@ class Player(Sprite):
 
     def __checkDead(self):
         if self.dead:
+            if not self.create_explosion: # get old positions for an explosion
+                self.old_pos_x = self.position_x
+                self.old_pos_y = self.position_y
+                self.create_explosion = True
             self.position_x = 0 # todo: temp
             self.dead = False
+
+    def __checkEdge(self):
+        if self.position_x >= 950:
+            self.hit_right = True
+        elif self.position_x <= 50:
+            self.hit_left = True
+        else:
+            self.hit_right = False
+            self.hit_left = False
+
+    def explosion(self):
+        if self.create_explosion:            
+            if not self.explode.stop or self.explode.reset:
+                self.explode.prepare(self.old_pos_x, self.old_pos_y)
+                self.explode.update()
+            else:
+                self.create_explosion = False
+                self.explode.reset = True
+
+        
+        
+
+
 
 
 
@@ -221,7 +336,7 @@ class Projectile(Sprite):
             self.position_y = pos_y
             self.firing = False
     
-    # define when an enemy fires
+    # define when an enemy fires TODO: change this - base on time, not a seed
     def __enemy_fire(self):
         # fire at random
         if not self.firing:
@@ -261,7 +376,7 @@ class EnemyController():
     # draw all enemies
     def draw(self):
         for enemy in self.enemy_list:
-            enemy.draw(enemy_sprite, enemy.position_x, enemy.position_y)
+            enemy.draw(enemy_sprite[enemy.sprite_type], enemy.position_x, enemy.position_y)
             if enemy.projectile.firing:                
                 enemy.projectile.draw(enemy_projectile_sprite, enemy.projectile.position_x, enemy.projectile.position_y)                
             else:
@@ -285,7 +400,10 @@ class Enemy(Sprite):
         self.create_explosion = False
         self.old_pos_x = 0
         self.old_pos_y = 0
-        self.explode = Explosion(explosion_sprite)
+        self.explode = Explosion(explosion_sprite, 16)
+
+        # create sprite type at random
+        self.sprite_type = random.randint(0, len(enemy_sprite) - 1)
 
     def update(self):
         self.__move_enemy()
@@ -302,7 +420,7 @@ class Enemy(Sprite):
 
     def check_dead(self):
         if self.dead:            
-            if not self.create_explosion:
+            if not self.create_explosion: # get old positions for an explosion
                 self.old_pos_x = self.position_x
                 self.old_pos_y = self.position_y
                 self.create_explosion = True
@@ -406,9 +524,10 @@ while not done:
         player.projectile.draw(player_projectile_sprite, player.projectile.position_x, player.projectile.position_y)
     else:
         player.projectile.update_rect(player_projectile_sprite, player.projectile.position_x, player.projectile.position_y) # if we are not drawing we still need to track the sprite position
+    if player.create_explosion:
+        player.explode.draw()
     enemy_controller.draw()
-
-
+    
     pygame.display.update()
 
 
