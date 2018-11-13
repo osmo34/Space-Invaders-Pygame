@@ -1,8 +1,37 @@
 # space invaders clone 2018 - Steve O https://github.com/osmo34
 # CS50 final project
 
+# polishing TODO:
+# player death - goes off screen, slides back on
+# on death player blows up - pause, score on screen - then game over screen
+# score on game over screen
+
 import pygame
 import random
+from enum import Enum, auto
+import sqlite3
+
+# database
+high_scores = []
+high_score = 0
+db = sqlite3.connect('scores.db')
+c = db.cursor()
+c.execute('''CREATE TABLE if not exists score("INTEGER scores")''')
+db.commit()
+
+for row in c.execute('SELECT * FROM score'):
+    high_scores.append(row)
+
+def calculate_high_score():
+    global high_score   
+    
+    if not high_scores:
+        high_scores.append((0,))        
+    
+    get_score = max(high_scores)
+    high_score = get_score[0]
+
+calculate_high_score()
 
 # init pygame
 pygame.init()
@@ -12,6 +41,10 @@ done = False # game loop
 clock = pygame.time.Clock()
 
 pygame.font.init()
+
+# title screen
+title_sprite = pygame.image.load('textures/title_screen/title.png') 
+game_over_title_sprite = pygame.image.load('textures/title_screen/game_over.png')
 
 # load sprites - current images being used are from Kenny https://www.kenney.nl/assets/space-shooter-redux
 player_sprite = pygame.image.load('textures/player/playerShip2_green.png') 
@@ -39,6 +72,13 @@ enemy_sprite = [
     pygame.image.load('textures/enemy/enemyRed3.png'),
     pygame.image.load('textures/enemy/enemyRed4.png'),
     pygame.image.load('textures/enemy/enemyRed5.png')
+    ]
+
+ufo_sprite = [
+    pygame.image.load('textures/ufo/ufoBlue.png'),
+    pygame.image.load('textures/ufo/ufoGreen.png'),
+    pygame.image.load('textures/ufo/ufoRed.png'),
+    pygame.image.load('textures/ufo/ufoYellow.png')
     ]
 
 explosion_sprite = [
@@ -84,7 +124,13 @@ player_explosion_sprite = [
     ]
 
 # background
-background_sprite = pygame.image.load('textures/bg/background_01.png').convert()
+background_sprite = [
+    pygame.image.load('textures/bg/background_01.png').convert(),
+    pygame.image.load('textures/bg/background_02.png').convert(),
+    pygame.image.load('textures/bg/background_03.png').convert()
+    ]
+
+background_current = 0
 
 # scale sprites
 player_sprite = pygame.transform.scale(player_sprite, (42, 28))
@@ -93,6 +139,9 @@ enemy_projectile_sprite = pygame.transform.scale(enemy_projectile_sprite, (5, 25
 
 for i in range(len(enemy_sprite)):
     enemy_sprite[i] = pygame.transform.scale(enemy_sprite[i], (26, 21))
+
+for i in range(len(ufo_sprite)):
+    ufo_sprite[i] = pygame.transform.scale(ufo_sprite[i], (30, 30))
 
 for i in range(len(explosion_sprite)):
     explosion_sprite[i] = pygame.transform.scale(explosion_sprite[i], (64, 64))
@@ -116,21 +165,38 @@ score = base_score
 lives = base_lives
 
 # player globals
-player_start_x = 500
-player_start_y = 700
-player_projectile_speed = 10
+base_player_start_x = 500
+base_player_start_y = 700
+player_start_x = base_player_start_x
+player_start_y = base_player_start_y
+player_projectile_speed = 15
 
 # ememy globals
-enemy_speed = 2.0
-enemy_speed_left = -2.0
-enemy_speed_right = 2.0
-enemy_speed_multiplier = 0.03
-enemy_speed_last_5 = 2.0
-enemy_speed_multiplier_final = 10.0
-enemy_drop_height = 4 # how many pixels we should move down on hitting the edge of the screen
-enemy_drop_last_5 = 10
-enemy_drop_last = 15
-enemy_update_height = 0 # how many pixels we have moved down
+base_enemy_speed = 2.0
+base_enemy_speed_left = -2.0
+base_enemy_speed_right = 2.0
+
+enemy_speed = base_enemy_speed
+enemy_speed_left = base_enemy_speed_left
+enemy_speed_right = base_enemy_speed_right
+
+enemy_speed_multiplier_base = 0.03
+enemy_speed_last_5_base = 1.9
+enemy_speed_multiplier_final_base = 10.0
+
+enemy_speed_multiplier = enemy_speed_multiplier_base
+enemy_speed_last_5 = enemy_speed_last_5_base
+enemy_speed_multiplier_final = enemy_speed_multiplier_final_base
+
+base_enemy_drop_height = 4 
+base_enemy_drop_last_5 = 25
+base_enemy_drop_last = 45
+enemy_drop_height = base_enemy_drop_height # how many pixels we should move down on hitting the edge of the screen
+enemy_drop_last_5 = base_enemy_drop_last_5
+enemy_drop_last = base_enemy_drop_last
+
+base_enemy_update_height = 0
+enemy_update_height = base_enemy_update_height # how many pixels we have moved down
 enemy_horizontal_seperation = 50
 enemy_vertical_seperation = 50
 enemy_rows = 6
@@ -139,17 +205,38 @@ default_enemy_x_pos = 150
 default_enemy_y_pos = 50
 enemy_edge_right = 1000
 enemy_edge_left = 0
-enemy_fire_rate = 1000 # max seed
+enemy_fire_rate_base = 1000
+enemy_fire_rate = enemy_fire_rate_base # max seed
 enemy_projectile_seed = -5
 base_enemy_score = 50
 enemy_score = base_enemy_score
-enemy_count = enemy_rows * enemy_colums + 1
-enemy_fire_rate_multiplier = enemy_fire_rate // enemy_count
+enemy_count_base = enemy_rows * enemy_colums + 1
+enemy_count = enemy_count_base
+enemy_fire_rate_multiplier_base = enemy_fire_rate_base // enemy_count_base
+enemy_fire_rate_multiplier = enemy_fire_rate_multiplier_base
 
+level_current_base = 1
+level_current = level_current_base
 
-level_current = 1
-level_multiplier = 1
+level_multiplier_base = 1
+level_multiplier = level_multiplier_base
 
+game_run_time = 0.0
+final_time = 0.0
+
+UFO_score_base = 1000
+UFO_score = UFO_score_base
+UFO_speed = 3.0
+
+# game state
+class GameState(Enum):
+    TITLE_SCREEN = auto()
+    IN_GAME = auto()
+    GAME_OVER = auto()
+
+game_state = GameState.TITLE_SCREEN
+
+# classes #
 
 # sprite base class
 class Sprite:
@@ -170,6 +257,7 @@ class Sprite:
         self.right = posx + sprite_rect.right
         self.top = posy + sprite_rect.top
         self.bottom = posy + sprite_rect.bottom
+
         
 
 # create explosion
@@ -217,6 +305,7 @@ class Explosion:
     def draw(self):
         if not self.stop:
             screen.blit(self.sprite[self.current_image], (self.pos_x, self.pos_y))
+
 
 
 # player class
@@ -310,8 +399,6 @@ class Projectile(Sprite):
             self.__check_screen_top(pos_x, pos_y)
             if self.hit_enemy:
                 self.__hit_enemy(pos_x, pos_y)
-                
-
         elif self.is_enemy:
             self.__check_screen_bottom(pos_x, pos_y)
             self.__enemy_fire()
@@ -362,6 +449,8 @@ class EnemyController():
         self.enemy_movement = EnemyMovement()
         self.enemy_position_x = default_enemy_x_pos
         self.enemy_position_y = default_enemy_y_pos
+        self.game_over = False
+        self.hit_bottom = False
     
     # place enemies in the game window
     def initialize(self):
@@ -371,12 +460,24 @@ class EnemyController():
                 self.enemy_position_x += enemy_horizontal_seperation
             self.enemy_position_y += enemy_vertical_seperation
             self.enemy_position_x = default_enemy_x_pos
+
+    def reset_enemies(self):
+        if not self.game_over:
+            self.enemy_list.clear()
+            self.enemy_position_x = default_enemy_x_pos
+            self.enemy_position_y = default_enemy_y_pos        
+            self.initialize()
+            self.game_over = True
+            self.hit_bottom = False
     
     # check if we hit an edge
     def update(self):
-        self.enemy_movement.check_edge(self.enemy_list)
-        for enemy in self.enemy_list:
-            enemy.update()
+        if not self.game_over:
+            self.enemy_movement.check_edge(self.enemy_list)
+            for enemy in self.enemy_list:
+                enemy.update()
+                if enemy.check_bottom_screen():
+                    self.hit_bottom = True
     
     # draw all enemies
     def draw(self):
@@ -421,6 +522,13 @@ class Enemy(Sprite):
     def __check_enemy_height(self):
         self.position_y = self.initial_height + enemy_update_height
 
+    def _boost_speed(self):
+        global enemy_speed
+        if enemy_speed > 0:
+            enemy_speed = enemy_speed_right
+        elif enemy_speed < 0:
+            enemy_speed = enemy_speed_left
+
     def check_dead(self):
         global score
         global enemy_fire_rate
@@ -437,24 +545,37 @@ class Enemy(Sprite):
                 
                 score += enemy_score
                 enemy_fire_rate -= enemy_fire_rate_multiplier
-
-                if enemy_count > 5:                    
+                
+                # make the game harder as we lose enemies
+                if enemy_count > 6:                    
                     enemy_speed_left -= enemy_speed_multiplier
-                    enemy_speed_right += enemy_speed_multiplier
+                    enemy_speed_right += enemy_speed_multiplier                    
+                    self._boost_speed() # smooth speed up 
+
                 elif enemy_count <= 6 and enemy_count > 2:                    
                     enemy_speed_left -= enemy_speed_last_5
                     enemy_speed_right += enemy_speed_last_5
                     enemy_drop_height = enemy_drop_last_5
+                    self._boost_speed()
+
                 elif enemy_count == 2:
                     enemy_speed_left_= -enemy_speed_multiplier_final
                     enemy_speed_right = enemy_speed_multiplier_final                             
                     enemy_drop_height = enemy_drop_last
-                enemy_count -= 1
-                
+                    self._boost_speed()
+
+                enemy_count -= 1               
 
             # if dead throw position into no mans land - way off the screen
             self.position_x = -1000
             self.position_y = 1000
+
+    # hit bottom of screen aka game over
+    def check_bottom_screen(self):
+        if self.position_y > 650 and not self.dead:
+            return True
+        else:
+            return False
 
     def explosion(self):
         if self.create_explosion:
@@ -481,6 +602,73 @@ class EnemyMovement:
                 enemy_update_height += enemy_drop_height
 
 
+# UFO
+class UFO(Sprite):
+    def __init__(self):
+        self.current_sprite = 0
+        self.start_pos_x = - 100
+        self.pos_x = self.start_pos_x
+        self.speed_x = UFO_speed
+        self.pos_y = 35
+        self.flying = False
+        self.dead = False
+        self.create_explosion = False
+        self.old_pos_x = 0
+        self.old_pos_y = 0
+        self.explode = Explosion(explosion_sprite, 16)
+        self.texture = 0
+
+    def update(self):
+        if self.flying:
+            self.pos_x += self.speed_x
+        if self.pos_x >= 1000:
+            self.pos_x = self.start_pos_x
+            self.flying = False       
+        
+        self.__start_flight()
+        self.__checkDead()
+        self.__get_textureID()
+        self.explosion()    
+
+    def __start_flight(self):
+        if not self.flying:
+            if game_run_time < 10:
+                return
+            else:
+               seed = random.randint(1, 750)               
+               if seed == 100:
+                   self.flying = True
+
+    def __checkDead(self):       
+        if self.dead:
+            if not self.create_explosion: # get old positions for an explosion
+                self.old_pos_x = self.pos_x
+                self.old_pos_y = self.pos_y
+                self.create_explosion = True                           
+            self.flying = False
+            self.pos_x = self.start_pos_x
+            self.dead = False
+            global lives
+            global score
+            lives += 1
+            score += UFO_score
+
+    def __get_textureID(self):
+        if not self.flying:
+            seed = random.randint(0, 2)
+            self.texture = seed            
+
+    def explosion(self):
+         if self.create_explosion:            
+            if not self.explode.stop or self.explode.reset:
+                self.explode.prepare(self.old_pos_x, self.old_pos_y)
+                self.explode.update()
+            else:
+                self.create_explosion = False
+                self.explode.reset = True
+
+
+# all collisions
 class Collision:
     def checkCollision(self, target, projectile):
         projectile_position = (projectile.left, projectile.right, projectile.top)
@@ -501,6 +689,8 @@ class Collision:
             del target_position
             return False
 
+
+
 # create on-screen text
 class Hud:
     def __init__(self, text, font, colour, position):
@@ -519,12 +709,41 @@ class Hud:
         screen.blit(self.textsurface, self.position)
 
 
+# title screen
+class TitleScreen(Sprite):
+    def update(self):
+        global game_state
+        k_pressed = pygame.key.get_pressed()        
+        if k_pressed[pygame.K_SPACE]:
+            game_state = GameState.IN_GAME
+
+
+# game over screen
+class GameOverScreen(Sprite):
+    def __ini__(self):
+        self.score = 0
+
+    def get_score_value(self, score):
+        self.score = score
+
+    def update(self):
+        global game_state
+        k_pressed = pygame.key.get_pressed()        
+        if k_pressed[pygame.K_RETURN]:            
+            game_state = GameState.TITLE_SCREEN
+
+
+
+# set up game
 # create instances   
+title_screen = TitleScreen()
+game_over_screen = GameOverScreen()
 player = Player()
 enemy_controller = EnemyController()
 enemy_controller.initialize()
 collision = Collision()
 background = Sprite()
+ufo = UFO()
 
 # create display text
 font = pygame.font.Font('font/kenvector_future.ttf', 20)
@@ -534,72 +753,224 @@ hud_text = []
 hud_text.append(Hud("Score", font, green_text, (10, 10)))
 hud_text.append(Hud("Lives", font, green_text, (400, 10)))
 hud_text.append(Hud("High Score", font, green_text, (700, 10)))
-hud_text.append(Hud("0000000", font, yellow_text, (875, 10)))
 
 # text that needs to be updated at runtime
 info_text = []
-text_display = [str(score), str(lives)]
+show_high_score = int(high_score)
+text_display = [str(score), str(lives), str(show_high_score)]
 info_text.append(Hud(text_display[0], font, yellow_text, (120, 10)))
 info_text.append(Hud(text_display[1], font, yellow_text, (500, 10)))
+info_text.append(Hud(text_display[2], font, yellow_text, (875, 10)))
+
 
 # start music
 pygame.mixer.music.play(-1)
 
-# run game loop
-while not done:
-    clock.tick(60) # tick at indicated fps
-
-    # pygame events
+def process_events():
+    global done
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
-            done = True
-    
-    # update game items
-    player.update()
-    enemy_controller.update()
+            done = True    
 
-    # track score per enemy
-    enemy_score = base_enemy_score * abs(enemy_speed) * level_multiplier
+# reset game
+def reset_game():    
+    global lives
+    global score
+    global player_start_x
+    global player_start_y
+    global enemy_speed
+    global enemy_speed_left
+    global enemy_speed_right
+    global enemy_drop_height
+    global enemy_drop_last_5
+    global enemy_drop_last
+    global enemy_update_height
+    global enemy_score
+    global enemy_count
+    global enemy_fire_rate_multiplier
+    global enemy_fire_rate
+    global level_current
+    global level_multiplier
+    global player
+    global game_run_time
+    global final_time
+    global enemy_speed_multiplier
+    global enemy_speed_last_5
+    global enemy_speed_multiplier_final    
 
-    # update lives and score text
-    for i in range(len(info_text)):
-        text_display.clear()        
-        text_display = [str(int(score)), str(lives)]
-        info_text[i].update(text_display[i])
-
-    # check collisions
-    for enemies in enemy_controller.enemy_list:         
-        if collision.checkCollision(enemies, player.projectile):
-            enemy_exploision.play()
-            enemies.dead = True
-            player.projectile.hit_enemy = True
-            break
-        if collision.checkCollision(player, enemies.projectile):
-            player.dead = True
-            break     
         
-    # draw
-    screen.fill((0,0,0))  
-    background.draw(background_sprite, 0, 0)
+    player_start_x = base_player_start_x    
+    player.position_x = player_start_x    
+    enemy_speed = base_enemy_speed
+    enemy_speed_left = base_enemy_speed_left
+    enemy_speed_right = base_enemy_speed_right
+    enemy_drop_height = base_enemy_drop_height
+    enemy_drop_last_5 = base_enemy_drop_last_5
+    enemy_drop_last = base_enemy_drop_last
+    enemy_update_height = base_enemy_update_height
+    enemy_score = base_enemy_score
+    enemy_count = enemy_count_base
+    enemy_fire_rate = enemy_fire_rate_base
+    enemy_fire_rate_multiplier = enemy_fire_rate_multiplier_base
+    enemy_speed_multiplier = enemy_speed_multiplier_base
+    enemy_speed_last_5 = enemy_speed_last_5_base
+    enemy_speed_multiplier_final = enemy_speed_multiplier_final_base
+    level_current = level_current_base
+    level_multiplier = level_multiplier_base
+    player.dead = False
+    enemy_controller.reset_enemies()
+    final_time += game_run_time
+    game_run_time = 0
 
-    player.draw(player_sprite, player.position_x, player.position_y)
-    if player.projectile.firing:
-        player.projectile.draw(player_projectile_sprite, player.projectile.position_x, player.projectile.position_y)
+def death_reset():
+    global score
+    global lives
+    global background_current
+    score = base_score
+    lives = base_lives
+    background_current = 0
+
+# todo - increase level
+def increase_level():
+    reset_game()   
+
+    global enemy_speed
+    global enemy_speed_left
+    global enemy_speed_right
+    global enemy_speed_multiplier
+    global enemy_speed_last_5
+    global enemy_speed_multiplier_final
+    global enemy_drop_height
+    global enemy_drop_last_5
+    global enemy_drop_last
+    global enemy_score
+    global background_current
+
+    # make it harder
+    enemy_speed += 0.1
+    enemy_speed_left -= 0.1
+    enemy_speed_right += 0.1
+    enemy_speed_multiplier += 0.02
+    enemy_speed_last_5 += 0.2
+    enemy_speed_multiplier_final += 3
+    enemy_drop_height += 1
+    enemy_drop_last_5 += 5
+    enemy_drop_last += 5
+    enemy_score *= 2
+
+    # change backdrop
+    if background_current == 2:
+        background_current = 0
     else:
-        player.projectile.update_rect(player_projectile_sprite, player.projectile.position_x, player.projectile.position_y) # if we are not drawing we still need to track the sprite position
-    if player.create_explosion:
-        player.explode.draw()
-    enemy_controller.draw()
+        background_current += 1
 
-    # draw hud items
-    for text in hud_text:
-        text.draw()
 
-    for text in info_text:
-        text.draw()
+# run game loop
+while not done:
+    while game_state == GameState.TITLE_SCREEN and not done:
+        process_events()
+        title_screen.update()        
+        screen.fill((0,0,0))  
+        title_screen.draw(title_sprite, 0, 0)
+        pygame.display.update()
     
-    pygame.display.update()
+    while game_state == GameState.GAME_OVER and not done:
+        process_events()
+        game_over_screen.update()
+        screen.fill((0,0,0))  
+        title_screen.draw(game_over_title_sprite, 0, 0)
+        pygame.display.update()
+    
+    while game_state == GameState.IN_GAME and not done:        
+        clock.tick(60) # tick at indicated fps
 
+        # timer variable 
+        game_run_time = pygame.time.get_ticks() / 1000 - final_time               
+
+        # we hit a new game and ensure we are not in game over state
+        if enemy_controller.game_over:
+            enemy_controller.game_over = False
+
+        # pygame events
+        process_events()       
+
+        # update game items
+        player.update()
+        enemy_controller.update()
+
+         # ufo        
+        ufo.update()   
+
+        # track score per enemy
+        enemy_score = base_enemy_score * abs(enemy_speed) * level_multiplier
+
+        # update lives and score text
+        for i in range(len(info_text)):
+            text_display.clear()
+            _show_score = int(high_score)
+            text_display = [str(int(score)), str(lives), str(_show_score)]
+            info_text[i].update(text_display[i])
+
+        # check collisions
+        for enemies in enemy_controller.enemy_list:         
+            if collision.checkCollision(enemies, player.projectile):
+                enemy_exploision.play()
+                enemies.dead = True
+                player.projectile.hit_enemy = True
+                break
+            if collision.checkCollision(player, enemies.projectile):
+                player.dead = True
+                break
+        
+        # end game
+        if lives == 0 or enemy_controller.hit_bottom: # TODO - or enemy hits bottom of screen 
+            # update scores, update high score if we have the highest value            
+            score = abs(score)
+            c.execute("INSERT INTO score VALUES (?)", (score,)) 
+            db.commit()
+            high_scores.append((score,))
+            calculate_high_score()
+            # start reset
+            reset_game()
+            death_reset()
+            game_over_screen.get_score_value(score)
+            game_state = GameState.GAME_OVER
+            
+        # Complete level
+        if enemy_count == 1:
+            increase_level()    
+        
+        # draw
+        screen.fill((0,0,0))  
+        background.draw(background_sprite[background_current], 0, 0)
+
+        player.draw(player_sprite, player.position_x, player.position_y)
+        if player.projectile.firing:
+            player.projectile.draw(player_projectile_sprite, player.projectile.position_x, player.projectile.position_y)
+        else:
+            player.projectile.update_rect(player_projectile_sprite, player.projectile.position_x, player.projectile.position_y) # if we are not drawing we still need to track the sprite position
+        if player.create_explosion:
+            player.explode.draw()
+        enemy_controller.draw()
+
+        ufo.draw(ufo_sprite[ufo.texture], ufo.pos_x, ufo.pos_y)
+        if ufo.create_explosion:
+            ufo.explode.draw()
+        # fussy - only works after draw code - ufo collisions
+        if collision.checkCollision(ufo, player.projectile):
+            ufo.dead = True
+            break
+
+        # draw hud items
+        for text in hud_text:
+            text.draw()
+
+        for text in info_text:
+            text.draw()
+    
+        pygame.display.update()
+
+db.close()
 pygame.quit()
 
         
