@@ -1,5 +1,6 @@
 # Space-Invaders-Pygame
 Space Invaders clone in Pygame
+Source Code in one file for simplicity (maybe not so when working on it!)
 
 Simple game created for my CS50 final project
 This uses Kenney Assets - https://www.kenney.nl/assets/space-shooter-redux
